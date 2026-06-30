@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CTI Panel</title>
+    <script src="https://static.oracle.com/cdn/ui-events-framework/libs/ui-events-framework-client.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: "Oracle Sans", "Helvetica Neue", Arial, sans-serif;
+            background: #0f0f0f; color: #fff; min-height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 20px; padding: 24px 16px;
+        }
+        .header { text-align: center; }
+        .header h1 { font-size: 16px; font-weight: 600; }
+        .header p  { font-size: 10px; color: #444; margin-top: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
+        .card {
+            background: #1a1a1a; border: 1px solid #252525;
+            border-radius: 10px; padding: 20px; width: 100%;
+            max-width: 400px; display: flex; flex-direction: column; gap: 16px;
+        }
+        .card-title { font-size: 9px; color: #444; letter-spacing: 0.1em; text-transform: uppercase; padding-bottom: 10px; border-bottom: 1px solid #1e1e1e; }
+        .agent-row { display: flex; align-items: center; justify-content: space-between; }
+        .agent-info { display: flex; align-items: center; gap: 10px; }
+        .agent-avatar { width: 34px; height: 34px; border-radius: 50%; background: #222; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #555; border: 2px solid #2a2a2a; transition: border-color 0.3s, color 0.3s; }
+        .agent-avatar.available { border-color: #28a745; color: #28a745; }
+        .agent-name  { font-size: 12px; font-weight: 600; color: #ccc; }
+        .agent-state { font-size: 10px; color: #444; transition: color 0.3s; }
+        .agent-state.available   { color: #28a745; }
+        .agent-state.unavailable { color: #dc3545; }
+        .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+        .toggle-label { font-size: 10px; color: #444; }
+        .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-track { position: absolute; inset: 0; background: #2a2a2a; border-radius: 22px; transition: background 0.3s; }
+        .toggle input:checked + .toggle-track { background: #28a745; }
+        .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform 0.3s; pointer-events: none; }
+        .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+        .status-bar { display: flex; align-items: center; gap: 8px; background: #111; border: 1px solid #1e1e1e; border-radius: 6px; padding: 8px 12px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; flex-shrink: 0; transition: background 0.3s; }
+        .status-dot.ready   { background: #28a745; }
+        .status-dot.ringing { background: #007bff; animation: pulse 0.8s infinite; }
+        .status-dot.oncall  { background: #ffc107; }
+        .status-dot.error   { background: #dc3545; }
+        @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.2} }
+        #status-text { font-size: 11px; color: #666; flex: 1; }
+        .call-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-label { font-size: 10px; color: #444; }
+        input[type="tel"] { flex: 1; background: #111; border: 1px solid #222; border-radius: 5px; color: #fff; padding: 8px 10px; font-size: 12px; outline: none; }
+        input[type="tel"]::placeholder { color: #333; }
+        .btn { padding: 7px 16px; border: none; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+        .btn:disabled { opacity: 0.25; cursor: not-allowed; }
+        .btn:not(:disabled):hover { opacity: 0.82; }
+        .btn-success { background: #28a745; color: #fff; }
+        .btn-danger  { background: #dc3545; color: #fff; }
+        .btn-warning { background: #e6a817; color: #111; }
+        .btn-neutral { background: #333; color: #aaa; }
+        .badge-row { display: flex; gap: 8px; }
+        .badge { font-size: 9px; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.05em; text-transform: uppercase; background: #1e1e1e; color: #444; border: 1px solid #252525; }
+        .badge.ok  { background: #0d2e14; color: #28a745; border-color: #1a4d25; }
+        .badge.err { background: #2e0d0d; color: #dc3545; border-color: #4d1a1a; }
+        .log-wrap { display: flex; flex-direction: column; gap: 6px; }
+        .log-top  { display: flex; justify-content: space-between; align-items: center; }
+        #log { background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 5px; font-family: monospace; font-size: 10px; max-height: 180px; overflow-y: auto; }
+        .log-row { display: flex; gap: 6px; padding: 3px 8px; border-bottom: 1px solid #111; line-height: 1.5; }
+        .log-row:last-child { border-bottom: none; }
+        .log-time { color: #2a2a2a; flex-shrink: 0; width: 60px; }
+        .log-dir  { flex-shrink: 0; width: 28px; font-weight: bold; font-size: 9px; }
+        .log-dir.in  { color: #4ec9b0; }
+        .log-dir.out { color: #dcdcaa; }
+        .log-msg     { color: #9cdcfe; }
+        .log-msg.ok  { color: #4ec9b0; }
+        .log-msg.err { color: #f48771; }
+        .log-msg.cmd { color: #c586c0; }
+        .footer-badges { display: flex; gap: 10px; justify-content: center; }
+        .footer-badge { font-size: 9px; color: #333; letter-spacing: 0.06em; text-transform: uppercase; }
+        .footer-badge.ok  { color: #28a745; }
+        .footer-badge.err { color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>CTI Agent Panel</h1>
+        <p>ACS + Oracle Fusion UEF</p>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Agent Status</div>
+        <div class="agent-row">
+            <div class="agent-info">
+                <div class="agent-avatar" id="agent-avatar">A</div>
+                <div>
+                    <div class="agent-name">Agent</div>
+                    <div class="agent-state" id="agent-state">Unavailable</div>
+                </div>
+            </div>
+            <div class="toggle-wrap">
+                <label class="toggle">
+                    <input type="checkbox" id="availability-toggle" onchange="toggleAvailability()" disabled>
+                    <span class="toggle-track"></span>
+                    <span class="toggle-thumb"></span>
+                </label>
+                <span class="toggle-label" id="toggle-label">Go Available</span>
+            </div>
+        </div>
+        <div class="status-bar">
+            <div class="status-dot" id="status-dot"></div>
+            <span id="status-text">Initializing...</span>
+        </div>
+        <div class="badge-row">
+            <span class="badge" id="badge-uef">UEF: connecting</span>
+            <span class="badge" id="badge-ws">Server: connecting</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Call Controls</div>
+        <div class="call-controls" id="inbound-controls" style="display:none">
+            <button class="btn btn-success" onclick="answerCall()">Answer</button>
+            <button class="btn btn-danger"  onclick="declineCall()">Decline</button>
+        </div>
+        <div class="call-controls" id="active-controls" style="display:none">
+            <button class="btn btn-danger"  onclick="hangupCall()">Hang Up</button>
+            <button class="btn btn-warning" id="btn-hold" onclick="toggleHold()">Hold</button>
+            <button class="btn btn-warning" id="btn-mute" onclick="toggleMute()">Mute</button>
+        </div>
+        <div class="input-group">
+            <div class="input-label">Simulate Inbound</div>
+            <input type="tel" id="phone-input" placeholder="+91xxxxxxxxxx" />
+            <button class="btn btn-neutral" id="btn-simulate" onclick="simulateInbound()" disabled>Simulate Inbound</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="log-wrap">
+            <div class="log-top">
+                <span style="font-size:10px;color:#444;letter-spacing:0.05em">EVENT LOG</span>
+                <button onclick="clearLog()" style="background:none;border:none;color:#555;font-size:10px;cursor:pointer">clear</button>
+            </div>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <div class="footer-badges">
+        <span class="footer-badge" id="footer-uef">UEF: —</span>
+        <span class="footer-badge" id="footer-ws">Server: —</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
